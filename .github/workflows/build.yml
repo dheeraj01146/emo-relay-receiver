@@ -28,7 +28,7 @@ jobs:
       - name: Compile Firmware to Binary
         run: |
           mkdir -p build_output
-          arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir build_output src/main.ino
+          arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir build_output ./src/main.ino
 
       - name: Upload .bin Artifact
         uses: actions/upload-artifact@v4

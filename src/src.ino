@@ -1,49 +1,104 @@
+/emo-relay-receiver/src/src.ino:1:10: fatal error: emo_espnow.h: No such file or directory
 #include "emo_espnow.h"
+```[cite: 3]
+
+Tune galti se EMO wala C++ code receiver ke **`src/src.ino`** mein daal diya hai! 
+
+* **Receiver board ko MAC address ki zaroorat hi nahi hoti.** Receiver to bas chupchap sunta hai (Listener).
+* **EMO robot** ko receiver ka MAC address chahiye hota hai taaki wo packet bhej sake (Sender).
+
+---
+
+### Isko 1 Minute Mein Theek Kar:
+
+Apne `emo-relay-receiver` repo ki **`src/src.ino`** file khol aur use is **Pure Universal Receiver Code** se replace kar de:
+
+```cpp
+#include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <esp_log.h>
-#include <cstring>
 
-#define TAG "EmoEspNow"
+// ================= RELAY GPIO SETUP =================
+#define RELAY_1 18 // Light 1
+#define RELAY_2 19 // Light 2
+#define RELAY_3 21 // Fan
+#define RELAY_4 22 // TV
 
-// Tera exact Receiver Board ka MAC Address
-static uint8_t s_receiver_mac[6] = {0x68, 0x09, 0x47, 0x86, 0x26, 0xA0};
-static bool s_espnow_initialized = false;
+// Active-LOW Relays: LOW hone par ON, HIGH hone par OFF
+#define RELAY_ON  LOW
+#define RELAY_OFF HIGH
 
-void InitEmoRelaySender() {
-    if (s_espnow_initialized) return;
+typedef struct struct_message {
+    uint8_t device;
+    uint8_t state;
+} struct_message;
+
+struct_message incomingPacket;
+
+void setRelay(uint8_t device, uint8_t state) {
+    uint8_t pin = 0;
+    switch (device) {
+        case 1: pin = RELAY_1; break;
+        case 2: pin = RELAY_2; break;
+        case 3: pin = RELAY_3; break;
+        case 4: pin = RELAY_4; break;
+        default: return;
+    }
+
+    digitalWrite(pin, (state == 1) ? RELAY_ON : RELAY_OFF);
+    Serial.printf("[RELAY] Device %d -> %s (Pin %d)\n", device, (state == 1) ? "ON" : "OFF", pin);
+}
+
+// Data Receive Callback
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+    Serial.printf("[ESP-NOW RECV] Packet Len: %d\n", len);
+    
+    if (len == sizeof(struct_message)) {
+        memcpy(&incomingPacket, incomingData, sizeof(struct_message));
+        setRelay(incomingPacket.device, incomingPacket.state);
+    } else if (len >= 2) {
+        uint8_t dev = incomingData[0];
+        uint8_t st  = incomingData[1];
+        setRelay(dev, st);
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    // Boot hote hi Relays ko OFF (HIGH) rakho
+    pinMode(RELAY_1, OUTPUT);
+    pinMode(RELAY_2, OUTPUT);
+    pinMode(RELAY_3, OUTPUT);
+    pinMode(RELAY_4, OUTPUT);
+
+    digitalWrite(RELAY_1, RELAY_OFF);
+    digitalWrite(RELAY_2, RELAY_OFF);
+    digitalWrite(RELAY_3, RELAY_OFF);
+    digitalWrite(RELAY_4, RELAY_OFF);
+
+    // Station Mode shuru karo
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
 
     if (esp_now_init() != ESP_OK) {
-        ESP_LOGE(TAG, "ESP-NOW Init Failed");
+        Serial.println("[ERROR] ESP-NOW Init Failed");
         return;
     }
 
-    esp_now_peer_info_t peer_info = {};
-    memcpy(peer_info.peer_addr, s_receiver_mac, 6);
-    peer_info.channel = 0; // 0 matlab router ke live Wi-Fi channel par sync rahega
-    peer_info.encrypt = false;
-
-    if (esp_now_add_peer(&peer_info) != ESP_OK) {
-        ESP_LOGW(TAG, "Peer already exists or add failed");
-    } else {
-        ESP_LOGI(TAG, "Receiver Peer Added: 68:09:47:86:26:A0");
-    }
-
-    s_espnow_initialized = true;
+    esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
+    Serial.println("[SYSTEM] Universal ESP-NOW Receiver Active & Scanning!");
 }
 
-void SendRelayControl(uint8_t device, uint8_t state) {
-    if (!s_espnow_initialized) {
-        InitEmoRelaySender();
+// Background Channel Hopping: Kisi bhi channel (1 se 13) ka packet pakad lega
+void loop() {
+    static uint8_t current_channel = 1;
+    esp_wifi_set_channel(current_channel, WIFI_SECOND_CHAN_NONE);
+    
+    current_channel++;
+    if (current_channel > 13) {
+        current_channel = 1;
     }
-
-    // 2-byte raw payload: [Device_ID, State]
-    uint8_t payload[2] = {device, state};
-
-    esp_err_t result = esp_now_send(s_receiver_mac, payload, sizeof(payload));
-    if (result == ESP_OK) {
-        ESP_LOGI(TAG, "Sent ESP-NOW -> Dev: %d, State: %d to Receiver", device, state);
-    } else {
-        ESP_LOGE(TAG, "ESP-NOW Send Error: %d", result);
-    }
+    
+    delay(40);
 }

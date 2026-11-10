@@ -1,84 +1,49 @@
-#include <WiFi.h>
+#include "emo_espnow.h"
 #include <esp_now.h>
+#include <esp_wifi.h>
+#include <esp_log.h>
+#include <cstring>
 
-// ================= RELAY GPIO SETUP =================
-#define RELAY_1 18 // Light 1
-#define RELAY_2 19 // Light 2
-#define RELAY_3 21 // Fan
-#define RELAY_4 22 // TV
+#define TAG "EmoEspNow"
 
-// Active-LOW Relays: LOW par ON, HIGH par OFF
-#define RELAY_ON  LOW
-#define RELAY_OFF HIGH
+// Tera exact Receiver Board ka MAC Address
+static uint8_t s_receiver_mac[6] = {0x68, 0x09, 0x47, 0x86, 0x26, 0xA0};
+static bool s_espnow_initialized = false;
 
-typedef struct struct_message {
-    uint8_t device;
-    uint8_t state;
-} struct_message;
-
-struct_message incomingPacket;
-
-void setRelay(uint8_t device, uint8_t state) {
-    uint8_t pin = 0;
-    switch (device) {
-        case 1: pin = RELAY_1; break;
-        case 2: pin = RELAY_2; break;
-        case 3: pin = RELAY_3; break;
-        case 4: pin = RELAY_4; break;
-        default: return;
-    }
-
-    digitalWrite(pin, (state == 1) ? RELAY_ON : RELAY_OFF);
-    Serial.printf("[RELAY] Device %d -> %s (Pin %d)\n", device, (state == 1) ? "ON" : "OFF", pin);
-}
-
-// ESP-NOW Data Receive Callback
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
-    if (len == sizeof(struct_message)) {
-        memcpy(&incomingPacket, incomingData, sizeof(struct_message));
-        Serial.printf("[ESP-NOW] Device: %d, State: %d\n", incomingPacket.device, incomingPacket.state);
-        setRelay(incomingPacket.device, incomingPacket.state);
-    } else if (len >= 2) {
-        uint8_t dev = incomingData[0];
-        uint8_t st  = incomingData[1];
-        Serial.printf("[ESP-NOW RAW] Device: %d, State: %d\n", dev, st);
-        setRelay(dev, st);
-    }
-}
-
-void setup() {
-    Serial.begin(115200);
-
-    // Relays ko pehle hi OFF (HIGH) set karo taaki boot hote hi click na kare
-    pinMode(RELAY_1, OUTPUT);
-    pinMode(RELAY_2, OUTPUT);
-    pinMode(RELAY_3, OUTPUT);
-    pinMode(RELAY_4, OUTPUT);
-
-    digitalWrite(RELAY_1, RELAY_OFF);
-    digitalWrite(RELAY_2, RELAY_OFF);
-    digitalWrite(RELAY_3, RELAY_OFF);
-    digitalWrite(RELAY_4, RELAY_OFF);
-
-    // Wi-Fi ko sirf Station mode me rakho (ESP-NOW ke liye zaroori hai)
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-
-    Serial.println("[SYSTEM] Initializing ESP-NOW Receiver...");
+void InitEmoRelaySender() {
+    if (s_espnow_initialized) return;
 
     if (esp_now_init() != ESP_OK) {
-        Serial.println("[ERROR] ESP-NOW Init Failed!");
+        ESP_LOGE(TAG, "ESP-NOW Init Failed");
         return;
     }
 
-    // Callback register karo
-    esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
-    Serial.println("[ESP-NOW] Receiver Ready & Listening!");
+    esp_now_peer_info_t peer_info = {};
+    memcpy(peer_info.peer_addr, s_receiver_mac, 6);
+    peer_info.channel = 0; // 0 matlab router ke live Wi-Fi channel par sync rahega
+    peer_info.encrypt = false;
+
+    if (esp_now_add_peer(&peer_info) != ESP_OK) {
+        ESP_LOGW(TAG, "Peer already exists or add failed");
+    } else {
+        ESP_LOGI(TAG, "Receiver Peer Added: 68:09:47:86:26:A0");
+    }
+
+    s_espnow_initialized = true;
 }
 
+void SendRelayControl(uint8_t device, uint8_t state) {
+    if (!s_espnow_initialized) {
+        InitEmoRelaySender();
+    }
 
+    // 2-byte raw payload: [Device_ID, State]
+    uint8_t payload[2] = {device, state};
 
-void loop() {
-    // ESP-NOW pura background interrupt par chalta hai, loop ko shant rakho
-    delay(100);
+    esp_err_t result = esp_now_send(s_receiver_mac, payload, sizeof(payload));
+    if (result == ESP_OK) {
+        ESP_LOGI(TAG, "Sent ESP-NOW -> Dev: %d, State: %d to Receiver", device, state);
+    } else {
+        ESP_LOGE(TAG, "ESP-NOW Send Error: %d", result);
+    }
 }

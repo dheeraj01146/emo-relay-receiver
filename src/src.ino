@@ -19,8 +19,8 @@ const char* CLIENT_ID       = "emo_hybrid_receiver_9921";
 #define RELAY_3 21 // Fan
 #define RELAY_4 22 // TV
 
-#define RELAY_ON  LOW
-#define RELAY_OFF HIGH
+#define RELAY_ON  HIGH
+#define RELAY_OFF LOW
 
 typedef struct struct_message {
     uint8_t device;
@@ -98,13 +98,19 @@ void reconnectMQTT() {
     }
 }
 
+// setup() mein:
 void setup() {
     Serial.begin(115200);
 
-    pinMode(RELAY_1, OUTPUT); digitalWrite(RELAY_1, RELAY_OFF);
-    pinMode(RELAY_2, OUTPUT); digitalWrite(RELAY_2, RELAY_OFF);
-    pinMode(RELAY_3, OUTPUT); digitalWrite(RELAY_3, RELAY_OFF);
-    pinMode(RELAY_4, OUTPUT); digitalWrite(RELAY_4, RELAY_OFF);
+    pinMode(RELAY_1, OUTPUT);
+    pinMode(RELAY_2, OUTPUT);
+    pinMode(RELAY_3, OUTPUT);
+    pinMode(RELAY_4, OUTPUT);
+
+    digitalWrite(RELAY_1, RELAY_OFF);
+    digitalWrite(RELAY_2, RELAY_OFF);
+    digitalWrite(RELAY_3, RELAY_OFF);
+    digitalWrite(RELAY_4, RELAY_OFF);
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);

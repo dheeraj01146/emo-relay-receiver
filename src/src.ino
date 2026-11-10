@@ -8,9 +8,9 @@
 #define RELAY_3 21 // Fan
 #define RELAY_4 22 // TV
 
-// Active-LOW Relays: LOW hone par ON, HIGH hone par OFF
-#define RELAY_ON  LOW
-#define RELAY_OFF HIGH
+// Active-HIGH Relays: HIGH hone par ON, LOW hone par OFF
+#define RELAY_ON  HIGH
+#define RELAY_OFF LOW
 
 typedef struct struct_message {
     uint8_t device;
@@ -50,7 +50,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
 
-    // Boot hote hi Relays ko OFF (HIGH) rakho
+    // Boot hote hi Relays ko OFF (LOW) rakho
     pinMode(RELAY_1, OUTPUT);
     pinMode(RELAY_2, OUTPUT);
     pinMode(RELAY_3, OUTPUT);
@@ -74,7 +74,7 @@ void setup() {
     Serial.println("[SYSTEM] Universal ESP-NOW Receiver Active & Scanning!");
 }
 
-// Background Channel Hopping: Kisi bhi channel (1 se 13) ka packet pakad lega
+// Background Channel Hopping: 1 se 13 channels scan karega
 void loop() {
     static uint8_t current_channel = 1;
     esp_wifi_set_channel(current_channel, WIFI_SECOND_CHAN_NONE);

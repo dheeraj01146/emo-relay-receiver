@@ -14,10 +14,10 @@ const char* TOPIC_STATE_PUB = "dheeraj_emo_hub_9921/status/relay";
 const char* CLIENT_ID       = "emo_hybrid_receiver_9921";
 
 // ================= RELAY GPIO =================
-#define RELAY_1 16 // Light 1
-#define RELAY_2 17 // Light 2
-#define RELAY_3 18 // Fan
-#define RELAY_4 19 // TV
+#define RELAY_1 18// Light 1
+#define RELAY_2 19 // Light 2
+#define RELAY_3 21 // Fan
+#define RELAY_4 22 // TV
 
 #define RELAY_ON  LOW
 #define RELAY_OFF HIGH

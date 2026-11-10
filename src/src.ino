@@ -12,8 +12,8 @@
 #define RELAY_ON  HIGH
 #define RELAY_OFF LOW
 
-// Fixed Lock on Channel 6
-#define FIXED_WIFI_CHANNEL 6
+// Fixed Lock on Channel 1 (EMO Sender ke sath exact match)
+#define FIXED_WIFI_CHANNEL 1
 
 void setRelay(uint8_t device, uint8_t state) {
     uint8_t pin = 0;
@@ -29,7 +29,12 @@ void setRelay(uint8_t device, uint8_t state) {
     Serial.printf("[ACTION] Dev: %d -> %s (Pin %d)\n", device, (state == 1) ? "ON" : "OFF", pin);
 }
 
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+// Receive callback (Compatible with both Core v2.x and v3.x)
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+void OnDataRecv(const esp_now_recv_info_t *esp_now_info, const uint8_t *incomingData, int len) {
+#else
+void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+#endif
     if (len >= 2) {
         uint8_t dev = incomingData[0];
         uint8_t st  = incomingData[1];
@@ -51,7 +56,7 @@ void setup() {
     digitalWrite(RELAY_3, RELAY_OFF);
     digitalWrite(RELAY_4, RELAY_OFF);
 
-    // Wi-Fi Station Mode aur Channel 6 Lock
+    // Wi-Fi Station Mode aur Channel 1 Lock
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
     
@@ -64,11 +69,11 @@ void setup() {
         return;
     }
 
-    esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
+    esp_now_register_recv_cb(OnDataRecv);
     Serial.printf("[SYSTEM] Fast Receiver Locked on Channel %d!\n", FIXED_WIFI_CHANNEL);
 }
 
 void loop() {
-    // Zero channel switching, instant response
+    // Instant response loop
     delay(10);
 }

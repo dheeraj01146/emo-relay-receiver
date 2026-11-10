@@ -12,8 +12,8 @@
 #define RELAY_ON  HIGH
 #define RELAY_OFF LOW
 
-// Fixed Lock on Channel 1 (EMO Sender ke sath exact match)
-#define FIXED_WIFI_CHANNEL 1
+// Fixed Lock on Channel 11 (Zero Lag, Instant Execution)
+#define FIXED_WIFI_CHANNEL 11
 
 void setRelay(uint8_t device, uint8_t state) {
     uint8_t pin = 0;
@@ -29,7 +29,6 @@ void setRelay(uint8_t device, uint8_t state) {
     Serial.printf("[ACTION] Dev: %d -> %s (Pin %d)\n", device, (state == 1) ? "ON" : "OFF", pin);
 }
 
-// Receive callback (Compatible with both Core v2.x and v3.x)
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 void OnDataRecv(const esp_now_recv_info_t *esp_now_info, const uint8_t *incomingData, int len) {
 #else
@@ -45,7 +44,6 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
 void setup() {
     Serial.begin(115200);
 
-    // Boot par sabhi relays ko seedha OFF state par rakho
     pinMode(RELAY_1, OUTPUT);
     pinMode(RELAY_2, OUTPUT);
     pinMode(RELAY_3, OUTPUT);
@@ -56,7 +54,7 @@ void setup() {
     digitalWrite(RELAY_3, RELAY_OFF);
     digitalWrite(RELAY_4, RELAY_OFF);
 
-    // Wi-Fi Station Mode aur Channel 1 Lock
+    // Wi-Fi Station Mode aur Channel 11 Hard Lock
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
     
@@ -74,6 +72,5 @@ void setup() {
 }
 
 void loop() {
-    // Instant response loop
     delay(10);
 }

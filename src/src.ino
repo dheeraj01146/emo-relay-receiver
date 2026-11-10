@@ -1,19 +1,3 @@
-/emo-relay-receiver/src/src.ino:1:10: fatal error: emo_espnow.h: No such file or directory
-#include "emo_espnow.h"
-```[cite: 3]
-
-Tune galti se EMO wala C++ code receiver ke **`src/src.ino`** mein daal diya hai! 
-
-* **Receiver board ko MAC address ki zaroorat hi nahi hoti.** Receiver to bas chupchap sunta hai (Listener).
-* **EMO robot** ko receiver ka MAC address chahiye hota hai taaki wo packet bhej sake (Sender).
-
----
-
-### Isko 1 Minute Mein Theek Kar:
-
-Apne `emo-relay-receiver` repo ki **`src/src.ino`** file khol aur use is **Pure Universal Receiver Code** se replace kar de:
-
-```cpp
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>

@@ -76,6 +76,8 @@ void setup() {
     Serial.println("[ESP-NOW] Receiver Ready & Listening!");
 }
 
+
+
 void loop() {
     // ESP-NOW pura background interrupt par chalta hai, loop ko shant rakho
     delay(100);

@@ -8,12 +8,14 @@
 #define RELAY_3 21 // Fan
 #define RELAY_4 22 // TV
 
-// Active HIGH logic: 1 = ON (HIGH), 0 = OFF (LOW)
+// Active HIGH logic: 1 = ON (HIGH), 0 = LOW
 #define RELAY_ON  HIGH
 #define RELAY_OFF LOW
 
-// Fixed Lock on Channel 11 (Zero Lag, Instant Execution)
-#define FIXED_WIFI_CHANNEL 11
+uint8_t current_channel = 6; // Default channel (Jio default)
+unsigned long last_recv_time = 0;
+unsigned long last_hop_time = 0;
+bool is_locked = false;
 
 void setRelay(uint8_t device, uint8_t state) {
     uint8_t pin = 0;
@@ -26,7 +28,13 @@ void setRelay(uint8_t device, uint8_t state) {
     }
 
     digitalWrite(pin, (state == 1) ? RELAY_ON : RELAY_OFF);
-    Serial.printf("[ACTION] Dev: %d -> %s (Pin %d)\n", device, (state == 1) ? "ON" : "OFF", pin);
+    Serial.printf("[ACTION] Dev: %d -> %s (Pin %d) on Ch %d\n", device, (state == 1) ? "ON" : "OFF", pin, current_channel);
+}
+
+void setWifiChannel(uint8_t ch) {
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+    esp_wifi_set_promiscuous(false);
 }
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -35,6 +43,9 @@ void OnDataRecv(const esp_now_recv_info_t *esp_now_info, const uint8_t *incoming
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
 #endif
     if (len >= 2) {
+        last_recv_time = millis();
+        is_locked = true; // Lock ho gaya, ab scan nahi karega!
+
         uint8_t dev = incomingData[0];
         uint8_t st  = incomingData[1];
         setRelay(dev, st);
@@ -54,13 +65,10 @@ void setup() {
     digitalWrite(RELAY_3, RELAY_OFF);
     digitalWrite(RELAY_4, RELAY_OFF);
 
-    // Wi-Fi Station Mode aur Channel 11 Hard Lock
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
-    
-    esp_wifi_set_promiscuous(true);
-    esp_wifi_set_channel(FIXED_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
-    esp_wifi_set_promiscuous(false);
+
+    setWifiChannel(current_channel);
 
     if (esp_now_init() != ESP_OK) {
         Serial.println("[ERROR] ESP-NOW Init Failed");
@@ -68,9 +76,20 @@ void setup() {
     }
 
     esp_now_register_recv_cb(OnDataRecv);
-    Serial.printf("[SYSTEM] Fast Receiver Locked on Channel %d!\n", FIXED_WIFI_CHANNEL);
+    Serial.printf("[SYSTEM] Smart Receiver Started on Channel %d\n", current_channel);
 }
 
 void loop() {
-    delay(10);
+    // Agar packet mil chuka hai, toh kisi scanning ki zaroorat nahi hai (Zero Lag)
+    // Lekin agar 10 second se EMO se koi link na mila ho, tabhi dheere-dheere channel switch karega
+    if (!is_locked || (millis() - last_recv_time > 10000)) {
+        if (millis() - last_hop_time > 300) { // Har 300ms me silent hop
+            last_hop_time = millis();
+            current_channel++;
+            if (current_channel > 13) current_channel = 1;
+            setWifiChannel(current_channel);
+        }
+    }
+
+    delay(5);
 }
